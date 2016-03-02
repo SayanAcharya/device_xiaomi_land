@@ -1645,6 +1645,7 @@ QCamera2HardwareInterface::QCamera2HardwareInterface(uint32_t cameraId)
       mPLastFrameCount(0),
       mPLastFpsTime(0),
       mPFps(0),
+      mInstantAecFrameCount(0),
       m_bIntJpegEvtPending(false),
       m_bIntRawEvtPending(false),
       mReprocJob(0),
@@ -5941,6 +5942,32 @@ int32_t QCamera2HardwareInterface::sendEvtNotify(int32_t msg_type,
 int32_t QCamera2HardwareInterface::processAEInfo(cam_3a_params_t &ae_params)
 {
     mParameters.updateAEInfo(ae_params);
+    if (mParameters.isInstantAECEnabled()) {
+        // Reset Instant AEC info only if instant aec enabled.
+        bool bResetInstantAec = false;
+        if (ae_params.settled) {
+            // If AEC settled, reset instant AEC
+            bResetInstantAec = true;
+        } else if ((mParameters.isInstantCaptureEnabled()) &&
+                (mInstantAecFrameCount >= mParameters.getAecFrameBoundValue())) {
+            // if AEC not settled, and instant capture enabled,
+            // reset instant AEC only when frame count is
+            // more or equal to AEC frame bound value.
+            bResetInstantAec = true;
+        } else if ((mParameters.isInstantAECEnabled()) &&
+                (mInstantAecFrameCount >= mParameters.getAecSkipDisplayFrameBound())) {
+            // if AEC not settled, and only instant AEC enabled,
+            // reset instant AEC only when frame count is
+            // more or equal to AEC skip display frame bound value.
+            bResetInstantAec = true;
+        }
+
+        if (bResetInstantAec) {
+            LOGD("setting instant AEC to false");
+            mParameters.setInstantAEC(false, true);
+            mInstantAecFrameCount = 0;
+        }
+    }
     return NO_ERROR;
 }
 
@@ -6975,6 +7002,8 @@ int32_t QCamera2HardwareInterface::addZSLChannel()
     }
     attr.water_mark = mParameters.getZSLQueueDepth();
     attr.max_unmatched_frames = mParameters.getMaxUnmatchedFramesInQueue();
+    attr.user_expected_frame_id =
+        mParameters.isInstantCaptureEnabled() ? (uint8_t)mParameters.getAecFrameBoundValue() : 0;
 
     //Enabled matched queue
     if (getRelatedCamSyncInfo()->is_frame_sync_enabled) {
@@ -9138,7 +9167,8 @@ bool QCamera2HardwareInterface::isCaptureShutterEnabled()
 bool QCamera2HardwareInterface::needProcessPreviewFrame()
 {
     return m_stateMachine.isPreviewRunning()
-            && m_stateMachine.isDisplayFrameNeeded();
+            && m_stateMachine.isDisplayFrameNeeded()
+            && !mParameters.isInstantAECEnabled();
 };
 
 /*===========================================================================
