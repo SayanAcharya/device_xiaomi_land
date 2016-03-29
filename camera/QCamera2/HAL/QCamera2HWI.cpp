@@ -3310,7 +3310,10 @@ int QCamera2HardwareInterface::enableMsgType(int32_t msg_type)
               Preview callback  in UBWC case*/
         if (!(msgTypeEnabled(CAMERA_MSG_PREVIEW_FRAME)) &&
                 (msg_type & CAMERA_MSG_PREVIEW_FRAME)) {
-            if (m_channels[QCAMERA_CH_TYPE_CALLBACK] != NULL) {
+            // Start callback channel only when preview channel is active
+            if ((m_channels[QCAMERA_CH_TYPE_CALLBACK] != NULL) &&
+                    (m_channels[QCAMERA_CH_TYPE_PREVIEW] != NULL) &&
+                    (m_channels[QCAMERA_CH_TYPE_PREVIEW]->isActive())){
                 rc = startChannel(QCAMERA_CH_TYPE_CALLBACK);
                 if (rc != NO_ERROR) {
                     LOGE("START Callback Channel failed");
@@ -3343,7 +3346,9 @@ int QCamera2HardwareInterface::disableMsgType(int32_t msg_type)
         /*STOP CALLBACK STREAM*/
         if ((msgTypeEnabled(CAMERA_MSG_PREVIEW_FRAME)) &&
                 (msg_type & CAMERA_MSG_PREVIEW_FRAME)) {
-            if (m_channels[QCAMERA_CH_TYPE_CALLBACK] != NULL) {
+            // Stop callback channel only if it is active
+            if ((m_channels[QCAMERA_CH_TYPE_CALLBACK] != NULL) &&
+                   (m_channels[QCAMERA_CH_TYPE_CALLBACK]->isActive())) {
                 rc = stopChannel(QCAMERA_CH_TYPE_CALLBACK);
                 if (rc != NO_ERROR) {
                     LOGE("STOP Callback Channel failed");
@@ -7990,7 +7995,7 @@ int32_t QCamera2HardwareInterface::preparePreview()
         }
     }
 
-    LOGI("E rc = %d", rc);
+    LOGI("X rc = %d", rc);
     return rc;
 }
 
