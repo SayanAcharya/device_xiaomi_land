@@ -1848,6 +1848,18 @@ int32_t QCameraStateMachine::procEvtPrepareSnapshotState(qcamera_sm_evt_enum_t e
             switch (cam_evt->server_event_type) {
             case CAM_EVENT_TYPE_DAEMON_DIED:
                 {
+                    // Send internal events to stop indefinite wait on prepare
+                    // snapshot done event.
+                    result.status = rc;
+                    result.request_api = QCAMERA_SM_EVT_PREPARE_SNAPSHOT;
+                    result.result_type = QCAMERA_API_RESULT_TYPE_DEF;
+                    m_parent->signalAPIResult(&result);
+
+                    result.status = rc;
+                    result.request_api = QCAMERA_SM_EVT_TAKE_PICTURE;
+                    result.result_type = QCAMERA_API_RESULT_TYPE_DEF;
+                    m_parent->signalAPIResult(&result);
+
                     m_parent->sendEvtNotify(CAMERA_MSG_ERROR,
                                             CAMERA_ERROR_SERVER_DIED,
                                             0);
@@ -2231,8 +2243,8 @@ int32_t QCameraStateMachine::procEvtPicTakingState(qcamera_sm_evt_enum_t evt,
             switch (cam_evt->server_event_type) {
             case CAM_EVENT_TYPE_DAEMON_DIED:
                 {
-                    // Send internal events to release statemachine
-                    // thread to process CAMERA_ERROR_SERVER_DIED error
+                    // Send internal events to stop indefinite wait on prepare
+                    // snapshot done event.
                     result.status = rc;
                     result.request_api = QCAMERA_SM_EVT_PREPARE_SNAPSHOT;
                     result.result_type = QCAMERA_API_RESULT_TYPE_DEF;
@@ -3593,6 +3605,18 @@ int32_t QCameraStateMachine::procEvtPreviewPicTakingState(qcamera_sm_evt_enum_t 
             switch (cam_evt->server_event_type) {
             case CAM_EVENT_TYPE_DAEMON_DIED:
                 {
+                    // Send internal events to stop indefinite wait on prepare
+                    // snapshot done event.
+                    result.status = rc;
+                    result.request_api = QCAMERA_SM_EVT_PREPARE_SNAPSHOT;
+                    result.result_type = QCAMERA_API_RESULT_TYPE_DEF;
+                    m_parent->signalAPIResult(&result);
+
+                    result.status = rc;
+                    result.request_api = QCAMERA_SM_EVT_TAKE_PICTURE;
+                    result.result_type = QCAMERA_API_RESULT_TYPE_DEF;
+                    m_parent->signalAPIResult(&result);
+
                     m_parent->sendEvtNotify(CAMERA_MSG_ERROR,
                                             CAMERA_ERROR_SERVER_DIED,
                                             0);
