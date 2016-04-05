@@ -1252,8 +1252,10 @@ int32_t mm_stream_write_user_buf(mm_stream_t * my_obj,
     struct msm_camera_user_buf_cont_t *cont_buf = NULL;
 
     if (buf->buf_type == CAM_STREAM_BUF_TYPE_USERPTR) {
+        pthread_mutex_lock(&my_obj->buf_lock);
         my_obj->buf_status[buf->buf_idx].buf_refcnt--;
         if (0 == my_obj->buf_status[buf->buf_idx].buf_refcnt) {
+            pthread_mutex_unlock(&my_obj->buf_lock);
             cont_buf = (struct msm_camera_user_buf_cont_t *)my_obj->buf[buf->buf_idx].buffer;
             cont_buf->buf_cnt = my_obj->buf[buf->buf_idx].user_buf.bufs_used;
             for (i = 0; i < (int32_t)cont_buf->buf_cnt; i++) {
@@ -1273,6 +1275,7 @@ int32_t mm_stream_write_user_buf(mm_stream_t * my_obj,
         } else {
             LOGD("<DEBUG> : ref count pending count :%d idx = %d",
                  my_obj->buf_status[buf->buf_idx].buf_refcnt, buf->buf_idx);
+            pthread_mutex_unlock(&my_obj->buf_lock);
         }
         return rc;
     }
@@ -1309,8 +1312,10 @@ int32_t mm_stream_write_user_buf(mm_stream_t * my_obj,
 
     if (my_obj->cur_bufs_staged
             == my_obj->buf[index].user_buf.bufs_used){
+        pthread_mutex_lock(&my_obj->buf_lock);
         my_obj->buf_status[index].buf_refcnt--;
         if (0 == my_obj->buf_status[index].buf_refcnt) {
+            pthread_mutex_unlock(&my_obj->buf_lock);
             cont_buf = (struct msm_camera_user_buf_cont_t *)my_obj->buf[index].buffer;
             cont_buf->buf_cnt = my_obj->buf[index].user_buf.bufs_used;
             for (i = 0; i < (int32_t)cont_buf->buf_cnt; i++) {
@@ -1332,6 +1337,7 @@ int32_t mm_stream_write_user_buf(mm_stream_t * my_obj,
         }else{
             LOGD("<DEBUG> : ref count pending count :%d idx = %d",
                  my_obj->buf_status[index].buf_refcnt, index);
+            pthread_mutex_unlock(&my_obj->buf_lock);
         }
     }
 
@@ -1468,6 +1474,7 @@ int32_t mm_stream_read_msm_frame(mm_stream_t * my_obj,
             LOGH("Stopped poll on stream %p type: %d",
                 my_obj, my_obj->stream_info->stream_type);
         }
+        pthread_mutex_unlock(&my_obj->buf_lock);
         uint32_t idx = vb.index;
         buf_info->buf = &my_obj->buf[idx];
         buf_info->frame_idx = vb.sequence;
@@ -1493,7 +1500,6 @@ int32_t mm_stream_read_msm_frame(mm_stream_t * my_obj,
         if(buf_info->buf->buf_type == CAM_STREAM_BUF_TYPE_USERPTR) {
             mm_stream_read_user_buf(my_obj, buf_info);
         }
-        pthread_mutex_unlock(&my_obj->buf_lock);
 
         if ( NULL != my_obj->mem_vtbl.clean_invalidate_buf ) {
             rc = my_obj->mem_vtbl.clean_invalidate_buf(idx,
@@ -1686,6 +1692,7 @@ int32_t mm_stream_qbuf(mm_stream_t *my_obj, mm_camera_buf_def_t *buf)
         LOGE("Cache invalidate op not added");
     }
 
+    pthread_mutex_lock(&my_obj->buf_lock);
     my_obj->queued_buffer_count++;
     if (1 == my_obj->queued_buffer_count) {
         /* Add fd to data poll thread */
@@ -1702,8 +1709,10 @@ int32_t mm_stream_qbuf(mm_stream_t *my_obj, mm_camera_buf_def_t *buf)
                 my_obj, my_obj->stream_info->stream_type);
         }
     }
+    pthread_mutex_unlock(&my_obj->buf_lock);
 
     rc = ioctl(my_obj->fd, VIDIOC_QBUF, &buffer);
+    pthread_mutex_lock(&my_obj->buf_lock);
     if (0 > rc) {
         LOGE("VIDIOC_QBUF ioctl call failed on stream type %d (rc=%d): %s",
              my_obj->stream_info->stream_type, rc, strerror(errno));
@@ -1724,6 +1733,7 @@ int32_t mm_stream_qbuf(mm_stream_t *my_obj, mm_camera_buf_def_t *buf)
                  buffer.index, buf->frame_idx, my_obj->stream_info->stream_type, rc,
                 my_obj->queued_buffer_count, buf->buf_type);
     }
+    pthread_mutex_unlock(&my_obj->buf_lock);
 
     return rc;
 }
@@ -2144,7 +2154,6 @@ int32_t mm_stream_reg_buf(mm_stream_t * my_obj)
         return rc;
     }
 
-    pthread_mutex_lock(&my_obj->buf_lock);
     my_obj->queued_buffer_count = 0;
     for(i = 0; i < my_obj->buf_num; i++){
         /* check if need to qbuf initially */
@@ -2163,7 +2172,6 @@ int32_t mm_stream_reg_buf(mm_stream_t * my_obj)
             my_obj->buf_status[i].in_kernel = 0;
         }
     }
-    pthread_mutex_unlock(&my_obj->buf_lock);
 
     return rc;
 }
@@ -4388,16 +4396,22 @@ int32_t mm_stream_buf_done(mm_stream_t * my_obj,
           my_obj->my_hdl, my_obj->fd, my_obj->state);
 
     pthread_mutex_lock(&my_obj->buf_lock);
-    if (my_obj->stream_info->streaming_mode == CAM_STREAMING_MODE_BATCH) {
-        rc = mm_stream_write_user_buf(my_obj, frame);
-    } else if(my_obj->buf_status[frame->buf_idx].buf_refcnt == 0) {
-        LOGD("Error Trying to free second time?(idx=%d) count=%d\n",
+    if(my_obj->buf_status[frame->buf_idx].buf_refcnt == 0) {
+        LOGE("Error Trying to free second time?(idx=%d) count=%d\n",
                     frame->buf_idx,
                    my_obj->buf_status[frame->buf_idx].buf_refcnt);
+        pthread_mutex_unlock(&my_obj->buf_lock);
         rc = -1;
+        return rc;
+    }
+    pthread_mutex_unlock(&my_obj->buf_lock);
+    if (my_obj->stream_info->streaming_mode == CAM_STREAMING_MODE_BATCH) {
+        rc = mm_stream_write_user_buf(my_obj, frame);
     } else {
+        pthread_mutex_lock(&my_obj->buf_lock);
         my_obj->buf_status[frame->buf_idx].buf_refcnt--;
         if (0 == my_obj->buf_status[frame->buf_idx].buf_refcnt) {
+            pthread_mutex_unlock(&my_obj->buf_lock);
             LOGD("<DEBUG> : Buf done for buffer:%d, stream:%d", frame->buf_idx, frame->stream_type);
             rc = mm_stream_qbuf(my_obj, frame);
             if(rc < 0) {
@@ -4411,9 +4425,9 @@ int32_t mm_stream_buf_done(mm_stream_t * my_obj,
                  my_obj->buf_status[frame->buf_idx].buf_refcnt);
             LOGD("<DEBUG> : for buffer:%p:%d",
                  my_obj, frame->buf_idx);
+            pthread_mutex_unlock(&my_obj->buf_lock);
         }
     }
-    pthread_mutex_unlock(&my_obj->buf_lock);
     return rc;
 }
 
