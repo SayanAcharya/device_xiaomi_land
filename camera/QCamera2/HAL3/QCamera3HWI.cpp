@@ -2760,8 +2760,8 @@ void QCamera3HardwareInterface::handleMetadataWithLock(
                     j != i->buffers.end(); j++) {
                 QCamera3ProcessingChannel *channel = (QCamera3ProcessingChannel *)j->stream->priv;
                 uint32_t streamID = channel->getStreamID(channel->getStreamTypeMask());
-                for (uint32_t k = 0; k < p_cam_frame_drop->num_streams; k++) {
-                    if (streamID == p_cam_frame_drop->streamID[k]) {
+                for (uint32_t k = 0; k < p_cam_frame_drop->cam_stream_ID.num_streams; k++) {
+                    if (streamID == p_cam_frame_drop->cam_stream_ID.streamID[k]) {
                         // Send Error notify to frameworks with CAMERA3_MSG_ERROR_BUFFER
                         LOGE("Start of reporting error frame#=%u, streamID=%u",
                                  i->frame_number, streamID);
