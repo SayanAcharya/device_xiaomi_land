@@ -766,7 +766,7 @@ private:
     Mutex mMapLock;
     Condition mMapCond;
     // Count to determine the number of preview frames ignored for displaying.
-    uint8_t mIgnoredPreviewCount;   
+    uint8_t mIgnoredPreviewCount;
     //The offset between BOOTTIME and MONOTONIC timestamps
     nsecs_t mBootToMonoTimestampOffset;
 };

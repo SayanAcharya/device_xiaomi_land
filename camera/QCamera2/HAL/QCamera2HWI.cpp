@@ -1663,7 +1663,6 @@ QCamera2HardwareInterface::QCamera2HardwareInterface(uint32_t cameraId)
       mMetadataMem(NULL),
       mCACDoneReceived(false),
       m_bNeedRestart(false),
-      mIgnoredPreviewCount(0),
       mBootToMonoTimestampOffset(0)
 {
 #ifdef TARGET_TS_MAKEUP
