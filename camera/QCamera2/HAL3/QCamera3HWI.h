@@ -37,7 +37,7 @@
 #include <utils/List.h>
 
 // Camera dependencies
-#include "camera3.h"
+#include "hardware/camera3.h"
 #include "QCamera3Channel.h"
 #include "QCamera3CropRegionMapper.h"
 #include "QCamera3HALHeader.h"
@@ -62,7 +62,6 @@ namespace qcamera {
 #endif
 
 /* Time related macros */
-typedef int64_t nsecs_t;
 #define NSEC_PER_SEC 1000000000LLU
 #define NSEC_PER_USEC 1000LLU
 #define NSEC_PER_33MSEC 33000000LLU
@@ -163,8 +162,7 @@ public:
     camera_metadata_t* translateFromHalMetadata(metadata_buffer_t *metadata,
                             nsecs_t timestamp, int32_t request_id,
                             const CameraMetadata& jpegMetadata, uint8_t pipeline_depth,
-                            uint8_t capture_intent, bool pprocDone, uint8_t fwk_cacMode,
-                            bool firstMetadataInBatch);
+                            uint8_t capture_intent, bool pprocDone, uint8_t fwk_cacMode);
     camera_metadata_t* saveRequestSettings(const CameraMetadata& jpegMetadata,
                             camera3_capture_request_t *request);
     int initParameters();
@@ -253,8 +251,7 @@ private:
     int32_t handlePendingReprocResults(uint32_t frame_number);
     int64_t getMinFrameDuration(const camera3_capture_request_t *request);
     void handleMetadataWithLock(mm_camera_super_buf_t *metadata_buf,
-            bool free_and_bufdone_meta_buf,
-            bool firstMetadataInBatch);
+            bool free_and_bufdone_meta_buf);
     void handleBatchMetadata(mm_camera_super_buf_t *metadata_buf,
             bool free_and_bufdone_meta_buf);
     void handleBufferWithLock(camera3_stream_buffer_t *buffer,
@@ -292,6 +289,7 @@ private:
     int32_t notifyErrorForPendingRequests();
     int32_t getReprocessibleOutputStreamId(uint32_t &id);
     int32_t handleCameraDeviceError();
+    nsecs_t getBootToMonoTimeOffset();
 
     bool isOnEncoder(const cam_dimension_t max_viewfinder_size,
             uint32_t width, uint32_t height);
@@ -346,6 +344,7 @@ private:
     int8_t  mSupportedFaceDetectMode;
     uint8_t m_bTnrPreview;
     uint8_t m_bTnrVideo;
+    uint8_t m_debug_avtimer;
 
     /* Data structure to store pending request */
     typedef struct {
@@ -449,8 +448,6 @@ private:
     uint32_t mFirstFrameNumberInBatch;
     camera3_stream_t mDummyBatchStream;
     bool mNeedSensorRestart;
-    uint32_t mMinInFlightRequests;
-    uint32_t mMaxInFlightRequests;
 
     /* sensor output size with current stream configuration */
     QCamera3CropRegionMapper mCropRegionMapper;
@@ -460,7 +457,6 @@ private:
     uint32_t mLdafCalib[2];
     bool mPowerHintEnabled;
     int32_t mLastCustIntentFrmNum;
-    CameraMetadata  mCachedMetadata;
 
     static const QCameraMap<camera_metadata_enum_android_control_effect_mode_t,
             cam_effect_mode_type> EFFECT_MODES_MAP[];
@@ -500,6 +496,9 @@ private:
     uint32_t mSurfaceStridePadding;
 
     State mState;
+    //The offset between BOOTTIME and MONOTONIC timestamps
+    nsecs_t mBootToMonoTimestampOffset;
+    bool mUseAVTimer;
 };
 
 }; // namespace qcamera

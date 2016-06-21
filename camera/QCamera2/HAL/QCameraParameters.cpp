@@ -3939,6 +3939,50 @@ int32_t QCameraParameters::setStillMore(const QCameraParameters& params)
     return NO_ERROR;
 }
 
+#ifdef TARGET_TS_MAKEUP
+
+/*===========================================================================
+ * FUNCTION   : setTsMakeup
+ *
+ * DESCRIPTION: set setTsMakeup from user setting
+ *
+ * PARAMETERS :
+ *   @params  : user setting parameters
+ *
+ * RETURN     : int32_t type of status
+ *              NO_ERROR  -- success
+ *              none-zero failure code
+ *==========================================================================*/
+int32_t QCameraParameters::setTsMakeup(const QCameraParameters& params)
+{
+    const char *str = params.get(KEY_TS_MAKEUP);
+    const char *prev_str = get(KEY_TS_MAKEUP);
+    LOGH("str =%s & prev_str =%s", str, prev_str);
+    if (str != NULL) {
+        if (prev_str == NULL || strcmp(str, prev_str) != 0) {
+            m_bNeedRestart = true;
+            set(KEY_TS_MAKEUP, str);
+        }
+        str = params.get(KEY_TS_MAKEUP_WHITEN);
+        prev_str = get(KEY_TS_MAKEUP_WHITEN);
+        if (str != NULL) {
+            if (prev_str == NULL || strcmp(str, prev_str) != 0) {
+                set(KEY_TS_MAKEUP_WHITEN, str);
+            }
+        }
+        str = params.get(KEY_TS_MAKEUP_CLEAN);
+        prev_str = get(KEY_TS_MAKEUP_CLEAN);
+        if (str != NULL) {
+            if (prev_str == NULL || strcmp(str, prev_str) != 0) {
+                set(KEY_TS_MAKEUP_CLEAN, str);
+            }
+        }
+    }
+    return NO_ERROR;
+}
+
+#endif
+
 /*===========================================================================
  * FUNCTION   : setRedeyeReduction
  *
@@ -4123,7 +4167,7 @@ int32_t QCameraParameters::setRecordingHint(const QCameraParameters& params)
                 updateParamEntry(KEY_RECORDING_HINT, str);
                 setRecordingHintValue(value);
                 if (getFaceDetectionOption() == true) {
-                    if (!isFDInVideoEnabled()) {
+                    if (!fdModeInVideo()) {
                         setFaceDetection(value > 0 ? false : true, false);
                     } else {
                         setFaceDetection(true, false);
@@ -5091,20 +5135,8 @@ int32_t QCameraParameters::updateParameters(const String8& p,
     setLowLightCapture();
 
     if ((rc = updateFlash(false)))                      final_rc = rc;
-
 #ifdef TARGET_TS_MAKEUP
-    if (params.get(KEY_TS_MAKEUP) != NULL) {
-        set(KEY_TS_MAKEUP,params.get(KEY_TS_MAKEUP));
-        final_rc = rc;
-    }
-    if (params.get(KEY_TS_MAKEUP_WHITEN) != NULL) {
-        set(KEY_TS_MAKEUP_WHITEN,params.get(KEY_TS_MAKEUP_WHITEN));
-        final_rc = rc;
-    }
-    if (params.get(KEY_TS_MAKEUP_CLEAN) != NULL) {
-        set(KEY_TS_MAKEUP_CLEAN,params.get(KEY_TS_MAKEUP_CLEAN));
-        final_rc = rc;
-    }
+    if ((rc = setTsMakeup(params)))                     final_rc = rc;
 #endif
 UPDATE_PARAM_DONE:
     needRestart = m_bNeedRestart;
@@ -6362,7 +6394,10 @@ int32_t QCameraParameters::setPreviewFpsRange(int min_fps,
                  min_fps, max_fps, vid_min_fps, vid_max_fps);
 
     if(fixedFpsValue != 0) {
-      min_fps = max_fps = vid_min_fps = vid_max_fps = (int)fixedFpsValue*1000;
+        min_fps = max_fps = fixedFpsValue*1000;
+        if (!isHfrMode()) {
+             vid_min_fps = vid_max_fps = fixedFpsValue*1000;
+        }
     }
     snprintf(str, sizeof(str), "%d,%d", min_fps, max_fps);
     LOGH("Setting preview fps range %s", str);
@@ -6380,13 +6415,14 @@ int32_t QCameraParameters::setPreviewFpsRange(int min_fps,
 
     if ( NULL != m_AdjustFPS ) {
         if (m_ThermalMode == QCAMERA_THERMAL_ADJUST_FPS &&
-                !m_bRecordingHint) {
+                !m_bRecordingHint_new) {
             float minVideoFps = min_fps, maxVideoFps = max_fps;
             if (isHfrMode()) {
                 minVideoFps = m_hfrFpsRange.video_min_fps;
                 maxVideoFps = m_hfrFpsRange.video_max_fps;
             }
-            m_AdjustFPS->recalcFPSRange(min_fps, max_fps, minVideoFps, maxVideoFps, fps_range);
+            m_AdjustFPS->recalcFPSRange(min_fps, max_fps, minVideoFps,
+                                         maxVideoFps, fps_range, m_bRecordingHint_new);
             LOGH("Thermal adjusted Preview fps range %3.2f,%3.2f, %3.2f, %3.2f",
                    fps_range.min_fps, fps_range.max_fps,
                   fps_range.video_min_fps, fps_range.video_max_fps);
@@ -7502,8 +7538,7 @@ int32_t QCameraParameters::configFrameCapture(bool commitSettings)
     }
 
     if (isHDREnabled() || m_bAeBracketingEnabled || m_bAFBracketingOn ||
-          m_bOptiZoomOn || m_bReFocusOn || m_LowLightLevel
-          || getManualCaptureMode()) {
+          m_bOptiZoomOn || m_bReFocusOn || getManualCaptureMode()) {
         value = CAM_FLASH_MODE_OFF;
     } else if (isChromaFlashEnabled()) {
         value = CAM_FLASH_MODE_ON;
@@ -7511,13 +7546,7 @@ int32_t QCameraParameters::configFrameCapture(bool commitSettings)
         value = mFlashValue;
     }
 
-    if (value != CAM_FLASH_MODE_OFF) {
-        configureFlash(m_captureFrameConfig);
-    } else if(isHDREnabled()) {
-        configureHDRBracketing (m_captureFrameConfig);
-    } else if(isAEBracketEnabled()) {
-        configureAEBracketing (m_captureFrameConfig);
-    } else if (m_LowLightLevel) {
+    if (m_LowLightLevel && (value != CAM_FLASH_MODE_ON)) {
         configureLowLight (m_captureFrameConfig);
 
         //Added reset capture type as a last batch for back-end to restore settings.
@@ -7525,6 +7554,12 @@ int32_t QCameraParameters::configFrameCapture(bool commitSettings)
         m_captureFrameConfig.configs[batch_count].type = CAM_CAPTURE_RESET;
         m_captureFrameConfig.configs[batch_count].num_frames = 0;
         m_captureFrameConfig.num_batch++;
+    } else if (value != CAM_FLASH_MODE_OFF) {
+        configureFlash(m_captureFrameConfig);
+    } else if(isHDREnabled()) {
+        configureHDRBracketing (m_captureFrameConfig);
+    } else if(isAEBracketEnabled()) {
+        configureAEBracketing (m_captureFrameConfig);
     } else if (getManualCaptureMode() >= CAM_MANUAL_CAPTURE_TYPE_2){
         rc = configureManualCapture (m_captureFrameConfig);
         //Added reset capture type as a last batch for back-end to restore settings.
@@ -7559,12 +7594,13 @@ int32_t QCameraParameters::configFrameCapture(bool commitSettings)
  *
  * PARAMETERS :
  *   @commitSettings : flag to enable or disable commit this this settings
+ *   @lowLightEnabled: flag to indicate if low light scene detected
  *
  * RETURN     : int32_t type of status
  *              NO_ERROR  -- success
  *              none-zero failure code
  *==========================================================================*/
-int32_t QCameraParameters::resetFrameCapture(bool commitSettings)
+int32_t QCameraParameters::resetFrameCapture(bool commitSettings, bool lowLightEnabled)
 {
     int32_t rc = NO_ERROR;
     memset(&m_captureFrameConfig, 0, sizeof(cam_capture_frame_config_t));
@@ -7583,7 +7619,7 @@ int32_t QCameraParameters::resetFrameCapture(bool commitSettings)
         }
         rc = stopAEBracket();
     } else if ((isChromaFlashEnabled()) || (mFlashValue != CAM_FLASH_MODE_OFF)
-            || (getLowLightLevel() != CAM_LOW_LIGHT_OFF)) {
+            || (lowLightEnabled == true)) {
         rc = setToneMapMode(true, false);
         if (rc != NO_ERROR) {
             LOGH("Failed to enable tone map during chroma flash");
@@ -9087,6 +9123,7 @@ int32_t QCameraParameters::setTruePortrait(const char *truePortraitStr)
         if (value != NAME_NOT_FOUND) {
             m_bTruePortraitOn = (value != 0);
             updateParamEntry(KEY_QC_TRUE_PORTRAIT, truePortraitStr);
+            setFaceDetection(m_bFaceDetectionOn, false);
             return NO_ERROR;
         }
     }
@@ -9424,8 +9461,9 @@ int32_t QCameraParameters::updateFlash(bool commitSettings)
       }
     }
 
+    // Turn Off Flash if any of the below AOST features are enabled
     if (isHDREnabled() || m_bAeBracketingEnabled || m_bAFBracketingOn ||
-          m_bOptiZoomOn || m_bReFocusOn || m_LowLightLevel) {
+          m_bOptiZoomOn || m_bReFocusOn || (m_bStillMoreOn && !m_bSeeMoreOn)) {
         value = CAM_FLASH_MODE_OFF;
     } else if (m_bChromaFlashOn) {
         value = CAM_FLASH_MODE_ON;
@@ -11106,13 +11144,24 @@ int32_t QCameraParameters::setFaceDetection(bool enabled, bool initCommit)
         if (getRecordingHintValue() > 0) {
             faceProcMask = 0;
             faceProcMask |= CAM_FACE_PROCESS_MASK_FOCUS;
+            if (fdModeInVideo() == CAM_FACE_PROCESS_MASK_DETECTION) {
+                faceProcMask |= CAM_FACE_PROCESS_MASK_DETECTION;
+            }
         } else {
             faceProcMask |= CAM_FACE_PROCESS_MASK_FOCUS;
             faceProcMask |= CAM_FACE_PROCESS_MASK_DETECTION;
         }
+        if (isTruePortraitEnabled()) {
+            LOGL("QCameraParameters::setFaceDetection trueportrait enabled");
+            faceProcMask |= CAM_FACE_PROCESS_MASK_GAZE;
+        } else {
+            LOGL("QCameraParameters::setFaceDetection trueportrait disabled");
+            faceProcMask &= ~CAM_FACE_PROCESS_MASK_GAZE;
+        }
     } else {
         faceProcMask &= ~(CAM_FACE_PROCESS_MASK_DETECTION
-                | CAM_FACE_PROCESS_MASK_FOCUS);
+                | CAM_FACE_PROCESS_MASK_FOCUS
+                | CAM_FACE_PROCESS_MASK_GAZE);
     }
 
     if(m_nFaceProcMask == faceProcMask) {
@@ -12560,7 +12609,7 @@ bool QCameraParameters::setStreamConfigure(bool isCapture,
         /* Analysis stream is needed by DCRF regardless of recording hint */
         if ((getDcrf() == true) ||
                 (getRecordingHintValue() != true) ||
-                (isFDInVideoEnabled())) {
+                (fdModeInVideo())) {
             stream_config_info.type[stream_config_info.num_streams] =
                     CAM_STREAM_TYPE_ANALYSIS;
             getStreamDimension(CAM_STREAM_TYPE_ANALYSIS,
@@ -13819,28 +13868,30 @@ void QCameraParameters::setLowLightCapture()
 }
 
 /*===========================================================================
- * FUNCTION   : isFDInVideoEnabled
+ * FUNCTION   : fdModeInVideo
  *
  * DESCRIPTION: FD in Video change
  *
  * PARAMETERS : none
  *
- * RETURN     : TRUE  : If FD in Video enabled
- *              FALSE : If FD in Video disabled
+ * RETURN     : FD Mode in Video
+ *              0 : If FD in Video disabled
+ *              1 : If FD in Video enabled for Detection, focus
+ *              2 : If FD in Video enabled only for focus
  *==========================================================================*/
-bool QCameraParameters::isFDInVideoEnabled()
+uint8_t QCameraParameters::fdModeInVideo()
 {
     char value[PROPERTY_VALUE_MAX];
-    bool fdvideo = FALSE;
+    uint8_t fdvideo = 0;
 
     if (!m_pCapability->hw_analysis_supported) {
         return FALSE;
     }
 
     property_get("persist.camera.fdvideo", value, "0");
-    fdvideo = (atoi(value) > 0) ? TRUE : FALSE;
+    fdvideo = (atoi(value) > 0) ? atoi(value) : 0;
 
-    LOGD("FD in Video enabled : %d", fdvideo);
+    LOGD("FD mode in Video : %d", fdvideo);
     return fdvideo;
 }
 

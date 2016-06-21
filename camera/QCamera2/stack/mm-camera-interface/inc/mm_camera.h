@@ -34,7 +34,7 @@
 #include <poll.h>
 
 // Camera dependencies
-#include "camera_common.h"
+#include "hardware/camera_common.h"
 #include "cam_semaphore.h"
 #include "mm_camera_interface.h"
 
@@ -49,7 +49,7 @@
 #define MM_CAMERA_CHANNEL_POLL_THREAD_MAX 1
 
 #define MM_CAMERA_DEV_NAME_LEN 32
-#define MM_CAMERA_DEV_OPEN_TRIES 30
+#define MM_CAMERA_DEV_OPEN_TRIES 20
 #define MM_CAMERA_DEV_OPEN_RETRY_SLEEP 20
 #define THREAD_NAME_SIZE 15
 

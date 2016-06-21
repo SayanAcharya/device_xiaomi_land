@@ -39,7 +39,7 @@
 // Camera dependencies
 #include "cam_intf.h"
 #include "cam_types.h"
-#include "camera3.h"
+#include "hardware/camera3.h"
 #include "QCamera3HALHeader.h"
 #include "QCamera3Mem.h"
 #include "QCamera3PostProc.h"
@@ -158,9 +158,9 @@ protected:
      * for this flag is true and is selectively set to false for the usecases
      * such as HFR to avoid any performance hit due to mapping/unmapping */
     bool    mPerFrameMapUnmapEnable;
-    uint32_t frm_num;
-    uint32_t dumpFrmCnt;
-    uint32_t skip_mode;
+    uint32_t mFrmNum;
+    uint32_t mDumpFrmCnt;
+    uint32_t mSkipMode;
     uint32_t mDumpSkipCnt;
 };
 
@@ -224,8 +224,6 @@ public:
 
     QCamera3PostProcessor m_postprocessor; // post processor
     void showDebugFPS(int32_t streamType);
-    bool isFwkInputBuffer(uint32_t resultFrameNumber);
-    int32_t releaseInputBuffer(uint32_t resultFrameNumber);
 
 protected:
     uint8_t mDebugFPS;
@@ -452,7 +450,6 @@ private:
     bool needsFramePostprocessing(metadata_buffer_t* meta);
     int32_t handleOfflinePpCallback(uint32_t resultFrameNumber,
             Vector<mm_camera_super_buf_t *>& pendingCbs);
-    mm_camera_super_buf_t* getNextPendingCbBuffer();
 };
 
 /* QCamera3PicChannel is for JPEG stream, which contains a YUV stream generated
