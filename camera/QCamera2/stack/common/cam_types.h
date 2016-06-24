@@ -137,6 +137,17 @@
 /*reprocess pipeline stages are pproc and jpeg */
 #define MAX_REPROCESS_PIPELINE_STAGES 2
 
+/* Defines the number of rows in the color correction matrix (CCM) */
+#define AWB_NUM_CCM_ROWS (3)
+
+/* Defines the number of columns in the color correction matrix (CCM) */
+#define AWB_NUM_CCM_COLS (3)
+
+/* Index to switch H/W to consume to free-run Q*/
+#define CAM_FREERUN_IDX 0xFFFFFFFF
+
+typedef uint64_t cam_feature_mask_t;
+
 typedef enum {
     CAM_HAL_V1 = 1,
     CAM_HAL_V3 = 3
