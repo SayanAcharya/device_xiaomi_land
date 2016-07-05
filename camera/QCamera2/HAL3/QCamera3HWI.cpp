@@ -1216,7 +1216,7 @@ void QCamera3HardwareInterface::updateFpsInPreviewBuffer(metadata_buffer_t *meta
                     CAM_INTF_PARM_FPS_RANGE, metadata) {
                 typeof (MetaData_t::refreshrate) cameraFps = float_range->max_fps;
                 struct private_handle_t *priv_handle =
-                        (struct private_handle_t *)(*(j->buffer));
+                    (struct private_handle_t *)(*(j->buffer));
                 setMetaData(priv_handle, UPDATE_REFRESH_RATE, &cameraFps);
             }
         }
