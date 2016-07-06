@@ -3527,6 +3527,66 @@ int QCamera3HardwareInterface::processCaptureRequest(
             goto error_exit;
         }
 
+        //update settings from app here
+        if (meta.exists(QCAMERA3_DUALCAM_LINK_ENABLE)) {
+            mIsDeviceLinked = meta.find(QCAMERA3_DUALCAM_LINK_ENABLE).data.u8[0];
+            LOGH("Dualcam: setting On=%d id =%d", mIsDeviceLinked, mCameraId);
+        }
+        if (meta.exists(QCAMERA3_DUALCAM_LINK_IS_MAIN)) {
+            mIsMainCamera = meta.find(QCAMERA3_DUALCAM_LINK_IS_MAIN).data.u8[0];
+            LOGH("Dualcam: Is this main camera = %d id =%d", mIsMainCamera, mCameraId);
+        }
+        if (meta.exists(QCAMERA3_DUALCAM_LINK_RELATED_CAMERA_ID)) {
+            mLinkedCameraId = meta.find(QCAMERA3_DUALCAM_LINK_RELATED_CAMERA_ID).data.u8[0];
+            LOGH("Dualcam: Linked camera Id %d id =%d", mLinkedCameraId, mCameraId);
+
+            if ( (mLinkedCameraId >= MM_CAMERA_MAX_NUM_SENSORS) &&
+                (mLinkedCameraId != mCameraId) ) {
+                LOGE("Dualcam: mLinkedCameraId %d is invalid, current cam id = %d",
+                    mLinkedCameraId, mCameraId);
+                pthread_mutex_unlock(&mMutex);
+                goto error_exit;
+            }
+        }
+
+        // add bundle related cameras
+        LOGH("%s: Dualcam: id =%d, mIsDeviceLinked=%d", __func__,mCameraId, mIsDeviceLinked);
+        if (meta.exists(QCAMERA3_DUALCAM_LINK_ENABLE)) {
+            if (mIsDeviceLinked)
+                m_pRelCamSyncBuf->sync_control = CAM_SYNC_RELATED_SENSORS_ON;
+            else
+                m_pRelCamSyncBuf->sync_control = CAM_SYNC_RELATED_SENSORS_OFF;
+
+            pthread_mutex_lock(&gCamLock);
+
+            if (sessionId[mLinkedCameraId] == 0xDEADBEEF) {
+                LOGE("Dualcam: Invalid Session Id ");
+                pthread_mutex_unlock(&gCamLock);
+                pthread_mutex_unlock(&mMutex);
+                goto error_exit;
+            }
+
+            if (mIsMainCamera == 1) {
+                m_pRelCamSyncBuf->mode = CAM_MODE_PRIMARY;
+                m_pRelCamSyncBuf->type = CAM_TYPE_MAIN;
+                // related session id should be session id of linked session
+                m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
+            } else {
+                m_pRelCamSyncBuf->mode = CAM_MODE_SECONDARY;
+                m_pRelCamSyncBuf->type = CAM_TYPE_AUX;
+                m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
+            }
+            pthread_mutex_unlock(&gCamLock);
+
+            rc = mCameraHandle->ops->sync_related_sensors(
+                    mCameraHandle->camera_handle, m_pRelCamSyncBuf);
+            if (rc < 0) {
+                LOGE("Dualcam: link failed");
+                pthread_mutex_unlock(&mMutex);
+                goto error_exit;
+            }
+        }
+
         //Then start them.
         LOGH("Start META Channel");
         rc = mMetadataChannel->start();
@@ -3724,6 +3784,7 @@ no_error:
             if(ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
                 CAM_INTF_META_FRAME_NUMBER, request->frame_number)) {
                 LOGE("Failed to set the frame number in the parameters");
+                pthread_mutex_unlock(&mMutex);
                 return BAD_VALUE;
             }
         }
