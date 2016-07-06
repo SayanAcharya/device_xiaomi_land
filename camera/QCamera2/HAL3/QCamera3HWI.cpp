@@ -2602,7 +2602,8 @@ void QCamera3HardwareInterface::handleBatchMetadata(
         }
         pthread_mutex_lock(&mMutex);
         handleMetadataWithLock(metadata_buf,
-                false /* free_and_bufdone_meta_buf */);
+                false /* free_and_bufdone_meta_buf */,
+                (i == 0) /* first metadata in the batch metadata */);
         pthread_mutex_unlock(&mMutex);
     }
 
@@ -2621,12 +2622,15 @@ void QCamera3HardwareInterface::handleBatchMetadata(
  * PARAMETERS : @metadata_buf: metadata buffer
  *              @free_and_bufdone_meta_buf: Buf done on the meta buf and free
  *                 the meta buf in this method
+ *              @firstMetadataInBatch: Boolean to indicate whether this is the
+ *                  first metadata in a batch. Valid only for batch mode
  *
  * RETURN     :
  *
  *==========================================================================*/
 void QCamera3HardwareInterface::handleMetadataWithLock(
-    mm_camera_super_buf_t *metadata_buf, bool free_and_bufdone_meta_buf)
+    mm_camera_super_buf_t *metadata_buf, bool free_and_bufdone_meta_buf,
+    bool firstMetadataInBatch)
 {
     ATRACE_CALL();
     if ((mFlushPerf) || (ERROR == mState) || (DEINIT == mState)) {
@@ -2829,7 +2833,8 @@ void QCamera3HardwareInterface::handleMetadataWithLock(
 
             result.result = translateFromHalMetadata(metadata,
                     i->timestamp, i->request_id, i->jpegMetadata, i->pipeline_depth,
-                    i->capture_intent, internalPproc, i->fwkCacMode);
+                    i->capture_intent, internalPproc, i->fwkCacMode,
+                    firstMetadataInBatch);
 
             saveExifParams(metadata);
 
@@ -4337,7 +4342,8 @@ void QCamera3HardwareInterface::captureResultCb(mm_camera_super_buf_t *metadata_
             hdrPlusPerfLock(metadata_buf);
             pthread_mutex_lock(&mMutex);
             handleMetadataWithLock(metadata_buf,
-                    true /* free_and_bufdone_meta_buf */);
+                    true /* free_and_bufdone_meta_buf */,
+                    false /* first frame of batch metadata */ );
             pthread_mutex_unlock(&mMutex);
         }
     } else if (isInputBuffer) {
@@ -4507,10 +4513,18 @@ QCamera3HardwareInterface::translateFromHalMetadata(
                                  uint8_t pipeline_depth,
                                  uint8_t capture_intent,
                                  bool pprocDone,
-                                 uint8_t fwk_cacMode)
+                                 uint8_t fwk_cacMode,
+                                 bool firstMetadataInBatch)
 {
     CameraMetadata camMetadata;
     camera_metadata_t *resultMetadata;
+
+    if (mBatchSize && !firstMetadataInBatch) {
+        /* In batch mode, use cached metadata from the first metadata
+            in the batch */
+        camMetadata.clear();
+        camMetadata = mCachedMetadata;
+    }
 
     if (jpegMetadata.entryCount())
         camMetadata.append(jpegMetadata);
@@ -4519,6 +4533,12 @@ QCamera3HardwareInterface::translateFromHalMetadata(
     camMetadata.update(ANDROID_REQUEST_ID, &request_id, 1);
     camMetadata.update(ANDROID_REQUEST_PIPELINE_DEPTH, &pipeline_depth, 1);
     camMetadata.update(ANDROID_CONTROL_CAPTURE_INTENT, &capture_intent, 1);
+
+    if (mBatchSize && !firstMetadataInBatch) {
+        /* In batch mode, use cached metadata instead of parsing metadata buffer again */
+        resultMetadata = camMetadata.release();
+        return resultMetadata;
+    }
 
     IF_META_AVAILABLE(uint32_t, frame_number, CAM_INTF_META_FRAME_NUMBER, metadata) {
         int64_t fwk_frame_number = *frame_number;
@@ -5308,6 +5328,45 @@ QCamera3HardwareInterface::translateFromHalMetadata(
             LOGD("ldafCalib[0] is %d, ldafCalib[1] is %d",
                     ldafCalib[0], ldafCalib[1]);
         }
+    }
+
+    // DDM debug data through vendor tag
+    cam_ddm_info_t ddm_info;
+    memset(&ddm_info, 0, sizeof(cam_ddm_info_t));
+    IF_META_AVAILABLE(cam_stream_crop_info_t, sensorCropInfo,
+            CAM_INTF_META_SNAP_CROP_INFO_SENSOR, metadata) {
+        memcpy(&(ddm_info.sensor_crop_info), sensorCropInfo, sizeof(cam_stream_crop_info_t));
+    }
+    IF_META_AVAILABLE(cam_stream_crop_info_t, camifCropInfo,
+            CAM_INTF_META_SNAP_CROP_INFO_CAMIF, metadata) {
+        memcpy(&(ddm_info.camif_crop_info), camifCropInfo, sizeof(cam_stream_crop_info_t));
+    }
+    IF_META_AVAILABLE(cam_stream_crop_info_t, ispCropInfo,
+            CAM_INTF_META_SNAP_CROP_INFO_ISP, metadata) {
+        memcpy(&(ddm_info.isp_crop_info), ispCropInfo, sizeof(cam_stream_crop_info_t));
+    }
+    IF_META_AVAILABLE(cam_stream_crop_info_t, cppCropInfo,
+            CAM_INTF_META_SNAP_CROP_INFO_CPP, metadata) {
+        memcpy(&(ddm_info.cpp_crop_info), cppCropInfo, sizeof(cam_stream_crop_info_t));
+    }
+    IF_META_AVAILABLE(cam_focal_length_ratio_t, ratio,
+            CAM_INTF_META_AF_FOCAL_LENGTH_RATIO, metadata) {
+        memcpy(&(ddm_info.af_focal_length_ratio), ratio, sizeof(cam_focal_length_ratio_t));
+    }
+    IF_META_AVAILABLE(int32_t, flip, CAM_INTF_PARM_FLIP, metadata) {
+        memcpy(&(ddm_info.pipeline_flip), flip, sizeof(int32_t));
+    }
+    IF_META_AVAILABLE(cam_rotation_info_t, rotationInfo,
+            CAM_INTF_PARM_ROTATION, metadata) {
+        memcpy(&(ddm_info.rotation_info), rotationInfo, sizeof(cam_rotation_info_t));
+    }
+    camMetadata.update(QCAMERA3_HAL_PRIVATEDATA_DDM_DATA_BLOB,
+            (uint8_t *)&ddm_info, sizeof(cam_ddm_info_t));
+
+    /* In batch mode, cache the first metadata in the batch */
+    if (mBatchSize && firstMetadataInBatch) {
+        mCachedMetadata.clear();
+        mCachedMetadata = camMetadata;
     }
 
     resultMetadata = camMetadata.release();
