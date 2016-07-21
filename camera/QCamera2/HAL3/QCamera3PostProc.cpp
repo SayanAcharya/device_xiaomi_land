@@ -1195,7 +1195,28 @@ int32_t QCamera3PostProcessor::encodeFWKData(qcamera_hal3_jpeg_data_t *jpeg_job_
         encodeParam.thumb_dim.src_dim = src_dim;
         encodeParam.thumb_dim.dst_dim = jpeg_settings->thumbnail_size;
 
-        getFWKJpegEncodeConfig(encodeParam, recvd_frame, jpeg_settings);
+        LOGI("Src Buffer cnt = %d, res = %dX%d len = %d rot = %d "
+            "src_dim = %dX%d dst_dim = %dX%d",
+            encodeParam.num_src_bufs,
+            encodeParam.src_main_buf[0].offset.mp[0].stride,
+            encodeParam.src_main_buf[0].offset.mp[0].scanline,
+            encodeParam.src_main_buf[0].offset.frame_len,
+            encodeParam.rotation,
+            src_dim.width, src_dim.height,
+            dst_dim.width, dst_dim.height);
+        LOGI("Src THUMB buf_cnt = %d, res = %dX%d len = %d rot = %d "
+            "src_dim = %dX%d, dst_dim = %dX%d",
+            encodeParam.num_tmb_bufs,
+            encodeParam.src_thumb_buf[0].offset.mp[0].stride,
+            encodeParam.src_thumb_buf[0].offset.mp[0].scanline,
+            encodeParam.src_thumb_buf[0].offset.frame_len,
+            encodeParam.thumb_rotation,
+            encodeParam.thumb_dim.src_dim.width,
+            encodeParam.thumb_dim.src_dim.height,
+            encodeParam.thumb_dim.dst_dim.width,
+            encodeParam.thumb_dim.dst_dim.height);
+
+>>>>>>> 6e03d0c... QCamera2: HAL: Set rotation same for main image and thumbnail:QCamera2/HAL3/QCamera3PostProc.cpp
         LOGH("#src bufs:%d # tmb bufs:%d #dst_bufs:%d",
                      encodeParam.num_src_bufs,encodeParam.num_tmb_bufs,encodeParam.num_dst_bufs);
 
@@ -1469,9 +1490,6 @@ int32_t QCamera3PostProcessor::encodeData(qcamera_hal3_jpeg_data_t *jpeg_job_dat
         }
         encodeParam.main_dim.dst_dim = dst_dim;
         encodeParam.thumb_dim.dst_dim = jpeg_settings->thumbnail_size;
-        if (needJpegRotation) {
-           encodeParam.rotation = (uint32_t)jpeg_settings->jpeg_orientation;
-        }
 
         LOGI("Src Buffer cnt = %d, res = %dX%d len = %d rot = %d "
             "src_dim = %dX%d dst_dim = %dX%d",

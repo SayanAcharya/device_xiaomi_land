@@ -633,6 +633,13 @@ int32_t QCameraPostProcessor::getJpegEncodingConfig(mm_jpeg_encode_params_t& enc
             (img_fmt_thumb != CAM_FORMAT_YUV_420_NV12_UBWC) &&
             (m_parent->mParameters.useJpegExifRotation() ||
             m_parent->mParameters.getJpegRotation() == 0);
+
+        if (encode_parm.thumb_from_postview &&
+          m_parent->mParameters.useJpegExifRotation()){
+          encode_parm.thumb_rotation =
+            m_parent->mParameters.getJpegExifRotation();
+        }
+
         LOGI("Src THUMB buf_cnt = %d, res = %dX%d len = %d rot = %d "
             "src_dim = %dX%d, dst_dim = %dX%d",
             encode_parm.num_tmb_bufs,
