@@ -3384,6 +3384,24 @@ int QCamera3HardwareInterface::processCaptureRequest(
 
         }
 
+        if (m_debug_avtimer || meta.exists(QCAMERA3_USE_AV_TIMER)) {
+            uint8_t* use_av_timer = NULL;
+
+            if (m_debug_avtimer){
+                use_av_timer = &m_debug_avtimer;
+            }
+            else{
+                use_av_timer =
+                    meta.find(QCAMERA3_USE_AV_TIMER).data.u8;
+            }
+
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters, CAM_INTF_META_USE_AV_TIMER, *use_av_timer)) {
+                rc = BAD_VALUE;
+            } else {
+                mUseAVTimer = *use_av_timer;
+            }
+        }
+
         setMobicat();
 
         /* Set fps and hfr mode while sending meta stream info so that sensor
