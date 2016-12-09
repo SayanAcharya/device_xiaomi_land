@@ -10421,4 +10421,129 @@ int32_t QCamera3HardwareInterface::setBundleInfo()
     return rc;
 }
 
+/*===========================================================================
+ * FUNCTION   : get_num_overall_buffers
+ *
+ * DESCRIPTION: Estimate number of pending buffers across all requests.
+ *
+ * PARAMETERS : None
+ *
+ * RETURN     : Number of overall pending buffers
+ *
+ *==========================================================================*/
+uint32_t PendingBuffersMap::get_num_overall_buffers()
+{
+    uint32_t sum_buffers = 0;
+    for (auto &req : mPendingBuffersInRequest) {
+        sum_buffers += req.mPendingBufferList.size();
+    }
+    return sum_buffers;
+}
+
+/*===========================================================================
+ * FUNCTION   : removeBuf
+ *
+ * DESCRIPTION: Remove a matching buffer from tracker.
+ *
+ * PARAMETERS : @buffer: image buffer for the callback
+ *
+ * RETURN     : None
+ *
+ *==========================================================================*/
+void PendingBuffersMap::removeBuf(buffer_handle_t *buffer)
+{
+    bool buffer_found = false;
+    for (auto req = mPendingBuffersInRequest.begin();
+            req != mPendingBuffersInRequest.end(); req++) {
+        for (auto k = req->mPendingBufferList.begin();
+                k != req->mPendingBufferList.end(); k++ ) {
+            if (k->buffer == buffer) {
+                LOGD("Frame %d: Found Frame buffer %p, take it out from mPendingBufferList",
+                        req->frame_number, buffer);
+                k = req->mPendingBufferList.erase(k);
+                if (req->mPendingBufferList.empty()) {
+                    // Remove this request from Map
+                    req = mPendingBuffersInRequest.erase(req);
+                }
+                buffer_found = true;
+                break;
+            }
+        }
+        if (buffer_found) {
+            break;
+        }
+    }
+    LOGD("mPendingBuffersMap.num_overall_buffers = %d",
+            get_num_overall_buffers());
+}
+
+/*===========================================================================
+ * FUNCTION   : setPAAFSupport
+ *
+ * DESCRIPTION: Set the preview-assisted auto focus support bit in
+ *              feature mask according to stream type and filter
+ *              arrangement
+ *
+ * PARAMETERS : @feature_mask: current feature mask, which may be modified
+ *              @stream_type: stream type
+ *              @filter_arrangement: filter arrangement
+ *
+ * RETURN     : None
+ *==========================================================================*/
+void QCamera3HardwareInterface::setPAAFSupport(
+        cam_feature_mask_t& feature_mask,
+        cam_stream_type_t stream_type,
+        cam_color_filter_arrangement_t filter_arrangement)
+{
+    LOGD("feature_mask=0x%llx; stream_type=%d, filter_arrangement=%d",
+            feature_mask, stream_type, filter_arrangement);
+
+    switch (filter_arrangement) {
+    case CAM_FILTER_ARRANGEMENT_RGGB:
+    case CAM_FILTER_ARRANGEMENT_GRBG:
+    case CAM_FILTER_ARRANGEMENT_GBRG:
+    case CAM_FILTER_ARRANGEMENT_BGGR:
+        if ((stream_type == CAM_STREAM_TYPE_PREVIEW) ||
+                (stream_type == CAM_STREAM_TYPE_VIDEO)) {
+            feature_mask |= CAM_QCOM_FEATURE_PAAF;
+        }
+        break;
+    case CAM_FILTER_ARRANGEMENT_Y:
+        if (stream_type == CAM_STREAM_TYPE_ANALYSIS) {
+            feature_mask |= CAM_QCOM_FEATURE_PAAF;
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+/*===========================================================================
+* FUNCTION   : getSensorMountAngle
+*
+* DESCRIPTION: Retrieve sensor mount angle
+*
+* PARAMETERS : None
+*
+* RETURN     : sensor mount angle in uint32_t
+*==========================================================================*/
+uint32_t QCamera3HardwareInterface::getSensorMountAngle()
+{
+    return gCamCapability[mCameraId]->sensor_mount_angle;
+}
+
+/*===========================================================================
+* FUNCTION   : getRelatedCalibrationData
+*
+* DESCRIPTION: Retrieve related system calibration data
+*
+* PARAMETERS : None
+*
+* RETURN     : Pointer of related system calibration data
+*==========================================================================*/
+const cam_related_system_calibration_data_t *QCamera3HardwareInterface::getRelatedCalibrationData()
+{
+    return (const cam_related_system_calibration_data_t *)
+            &(gCamCapability[mCameraId]->related_cam_calibration);
+}
 }; //end namespace qcamera
