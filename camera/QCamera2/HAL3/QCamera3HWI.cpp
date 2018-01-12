@@ -5312,7 +5312,7 @@ QCamera3HardwareInterface::translateFromHalMetadata(
         }
     }
 
-    // DDM debug data through vendor tag
+    /*/ DDM debug data through vendor tag
     cam_ddm_info_t ddm_info;
     memset(&ddm_info, 0, sizeof(cam_ddm_info_t));
     IF_META_AVAILABLE(cam_stream_crop_info_t, sensorCropInfo,
@@ -5343,7 +5343,7 @@ QCamera3HardwareInterface::translateFromHalMetadata(
         memcpy(&(ddm_info.rotation_info), rotationInfo, sizeof(cam_rotation_info_t));
     }
     camMetadata.update(QCAMERA3_HAL_PRIVATEDATA_DDM_DATA_BLOB,
-            (uint8_t *)&ddm_info, sizeof(cam_ddm_info_t));
+            (uint8_t *)&ddm_info, sizeof(cam_ddm_info_t));*/
 
     /* In batch mode, cache the first metadata in the batch */
     if (mBatchSize && firstMetadataInBatch) {
