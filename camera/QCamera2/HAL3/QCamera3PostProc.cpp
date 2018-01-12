@@ -1216,7 +1216,6 @@ int32_t QCamera3PostProcessor::encodeFWKData(qcamera_hal3_jpeg_data_t *jpeg_job_
             encodeParam.thumb_dim.dst_dim.width,
             encodeParam.thumb_dim.dst_dim.height);
 
->>>>>>> 6e03d0c... QCamera2: HAL: Set rotation same for main image and thumbnail:QCamera2/HAL3/QCamera3PostProc.cpp
         LOGH("#src bufs:%d # tmb bufs:%d #dst_bufs:%d",
                      encodeParam.num_src_bufs,encodeParam.num_tmb_bufs,encodeParam.num_dst_bufs);
 

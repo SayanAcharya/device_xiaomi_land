@@ -2157,9 +2157,8 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
                 CAM_STREAM_TYPE_CALLBACK,
                 &QCamera3SupportChannel::kDim,
                 CAM_FORMAT_YUV_420_NV21,
-                supportInfo.hw_analysis_supported,
-                gCamCapability[mCameraId]->color_arrangement,
-                this, 0);
+                gCamCapability[mCameraId]->hw_analysis_supported,
+                this);
         if (!mSupportChannel) {
             LOGE("dummy channel cannot be created");
             pthread_mutex_unlock(&mMutex);
@@ -4006,9 +4005,8 @@ no_error:
         return NO_ERROR;
     }
 
-    int indexUsed;
     // Notify metadata channel we receive a request
-    mMetadataChannel->request(NULL, frameNumber, indexUsed);
+    mMetadataChannel->request(NULL, frameNumber);
 
     if(request->input_buffer != NULL){
         LOGD("Input request, frame_number %d", frameNumber);
@@ -4037,7 +4035,7 @@ no_error:
                       output.buffer, request->input_buffer, frameNumber);
             if(request->input_buffer != NULL){
                 rc = channel->request(output.buffer, frameNumber,
-                        pInputBuffer, &mReprocMeta, indexUsed);
+                        pInputBuffer, &mReprocMeta);
                 if (rc < 0) {
                     LOGE("Fail to request on picture channel");
                     pthread_mutex_unlock(&mMutex);
@@ -4048,33 +4046,16 @@ no_error:
                          output.buffer, frameNumber);
                 if (!request->settings) {
                     rc = channel->request(output.buffer, frameNumber,
-                            NULL, mPrevParameters, indexUsed);
+                            NULL, mPrevParameters);
                 } else {
                     rc = channel->request(output.buffer, frameNumber,
-                            NULL, mParameters, indexUsed);
+                            NULL, mParameters);
                 }
                 if (rc < 0) {
                     LOGE("Fail to request on picture channel");
                     pthread_mutex_unlock(&mMutex);
                     return rc;
                 }
-
-                uint32_t streamId = channel->getStreamID(channel->getStreamTypeMask());
-                uint32_t j = 0;
-                for (j = 0; j < streamsArray.num_streams; j++) {
-                    if (streamsArray.stream_request[j].streamID == streamId) {
-                      if (mOpMode == CAMERA3_STREAM_CONFIGURATION_CONSTRAINED_HIGH_SPEED_MODE)
-                          streamsArray.stream_request[j].buf_index = CAM_FREERUN_IDX;
-                      else
-                          streamsArray.stream_request[j].buf_index = indexUsed;
-                        break;
-                    }
-                }
-                if (j == streamsArray.num_streams) {
-                    LOGE("Did not find matching stream to update index");
-                    assert(0);
-                }
-
                 pendingBufferIter->need_metadata = true;
                 streams_need_metadata++;
             }
@@ -4094,29 +4075,12 @@ no_error:
             QCamera3YUVChannel *yuvChannel = (QCamera3YUVChannel *)channel;
             rc = yuvChannel->request(output.buffer, frameNumber,
                     pInputBuffer,
-                    (pInputBuffer ? &mReprocMeta : mParameters), needMetadata, indexUsed);
+                    (pInputBuffer ? &mReprocMeta : mParameters), needMetadata);
             if (rc < 0) {
                 LOGE("Fail to request on YUV channel");
                 pthread_mutex_unlock(&mMutex);
                 return rc;
             }
-
-            uint32_t streamId = channel->getStreamID(channel->getStreamTypeMask());
-            uint32_t j = 0;
-            for (j = 0; j < streamsArray.num_streams; j++) {
-                if (streamsArray.stream_request[j].streamID == streamId) {
-                    if (mOpMode == CAMERA3_STREAM_CONFIGURATION_CONSTRAINED_HIGH_SPEED_MODE)
-                        streamsArray.stream_request[j].buf_index = CAM_FREERUN_IDX;
-                    else
-                        streamsArray.stream_request[j].buf_index = indexUsed;
-                    break;
-                }
-            }
-            if (j == streamsArray.num_streams) {
-                LOGE("Did not find matching stream to update index");
-                assert(0);
-            }
-
             pendingBufferIter->need_metadata = needMetadata;
             if (needMetadata)
                 streams_need_metadata += 1;
@@ -4125,25 +4089,7 @@ no_error:
         } else {
             LOGD("request with buffer %p, frame_number %d",
                   output.buffer, frameNumber);
-
-            rc = channel->request(output.buffer, frameNumber, indexUsed);
-
-            uint32_t streamId = channel->getStreamID(channel->getStreamTypeMask());
-            uint32_t j = 0;
-            for (j = 0; j < streamsArray.num_streams; j++) {
-                if (streamsArray.stream_request[j].streamID == streamId) {
-                    if (mOpMode == CAMERA3_STREAM_CONFIGURATION_CONSTRAINED_HIGH_SPEED_MODE)
-                        streamsArray.stream_request[j].buf_index = CAM_FREERUN_IDX;
-                    else
-                        streamsArray.stream_request[j].buf_index = indexUsed;
-                    break;
-                }
-            }
-            if (j == streamsArray.num_streams) {
-                LOGE("Did not find matching stream to update index");
-                assert(0);
-            }
-
+            rc = channel->request(output.buffer, frameNumber);
             if (((1U << CAM_STREAM_TYPE_VIDEO) == channel->getStreamTypeMask())
                     && mBatchSize) {
                 mToBeQueuedVidBufs++;
@@ -4181,33 +4127,6 @@ no_error:
             LOGD("set_parms  batchSz: %d IsVidBufReq: %d vidBufTobeQd: %d ",
                      mBatchSize, isVidBufRequested,
                     mToBeQueuedVidBufs);
-
-            if(mBatchSize && isVidBufRequested && (mToBeQueuedVidBufs == mBatchSize)) {
-                for (uint32_t k = 0; k < streamsArray.num_streams; k++) {
-                    uint32_t m = 0;
-                    for (m = 0; m < mBatchedStreamsArray.num_streams; m++) {
-                        if (streamsArray.stream_request[k].streamID ==
-                                mBatchedStreamsArray.stream_request[m].streamID)
-                            break;
-                        }
-                        if (m == mBatchedStreamsArray.num_streams) {
-                            mBatchedStreamsArray.stream_request\
-                                [mBatchedStreamsArray.num_streams].streamID =
-                                streamsArray.stream_request[k].streamID;
-                            mBatchedStreamsArray.stream_request\
-                                [mBatchedStreamsArray.num_streams].buf_index =
-                                streamsArray.stream_request[k].buf_index;
-                            mBatchedStreamsArray.num_streams = mBatchedStreamsArray.num_streams + 1;
-                        }
-                }
-                streamsArray = mBatchedStreamsArray;
-            }
-            /* Update stream id of all the requested buffers */
-            if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters, CAM_INTF_META_STREAM_ID, streamsArray)) {
-                LOGE("Failed to set stream type mask in the parameters");
-                return BAD_VALUE;
-            }
-
             rc = mCameraHandle->ops->set_parms(mCameraHandle->camera_handle,
                     mParameters);
             if (rc < 0) {
