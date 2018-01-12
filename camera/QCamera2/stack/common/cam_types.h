@@ -107,7 +107,6 @@
 #define MAX_INFLIGHT_REQUESTS  6
 #define MAX_INFLIGHT_BLOB      3
 #define MIN_INFLIGHT_REQUESTS  3
-#define MIN_INFLIGHT_60FPS_REQUESTS (6)
 #define MAX_INFLIGHT_REPROCESS_REQUESTS 1
 #define MAX_INFLIGHT_HFR_REQUESTS (48)
 #define MIN_INFLIGHT_HFR_REQUESTS (40)
@@ -136,17 +135,6 @@
 
 /*reprocess pipeline stages are pproc and jpeg */
 #define MAX_REPROCESS_PIPELINE_STAGES 2
-
-/* Defines the number of rows in the color correction matrix (CCM) */
-#define AWB_NUM_CCM_ROWS (3)
-
-/* Defines the number of columns in the color correction matrix (CCM) */
-#define AWB_NUM_CCM_COLS (3)
-
-/* Index to switch H/W to consume to free-run Q*/
-#define CAM_FREERUN_IDX 0xFFFFFFFF
-
-typedef uint64_t cam_feature_mask_t;
 
 typedef enum {
     CAM_HAL_V1 = 1,
@@ -1349,16 +1337,10 @@ typedef enum {
     NEED_FUTURE_FRAME,
 } cam_prep_snapshot_state_t;
 
-typedef enum {
-    CC_RED_GAIN,
-    CC_GREEN_RED_GAIN,
-    CC_GREEN_BLUE_GAIN,
-    CC_BLUE_GAIN,
-    CC_GAIN_MAX
-} cam_cc_gains_type_t;
+#define CC_GAINS_COUNT  4
 
 typedef struct {
-    float gains[CC_GAIN_MAX];
+    float gains[CC_GAINS_COUNT];
 } cam_color_correct_gains_t;
 
 typedef struct {
@@ -1572,13 +1554,8 @@ typedef struct {
 } cam_hw_data_overwrite_t;
 
 typedef struct {
-    uint32_t streamID;
-    uint32_t buf_index;
-} cam_stream_request_t;
-
-typedef struct {
     uint32_t num_streams;
-    cam_stream_request_t stream_request[MAX_NUM_STREAMS];
+    uint32_t streamID[MAX_NUM_STREAMS];
 } cam_stream_ID_t;
 
 /*CAC Message posted during pipeline*/

@@ -158,9 +158,9 @@ protected:
      * for this flag is true and is selectively set to false for the usecases
      * such as HFR to avoid any performance hit due to mapping/unmapping */
     bool    mPerFrameMapUnmapEnable;
-    uint32_t mFrmNum;
-    uint32_t mDumpFrmCnt;
-    uint32_t mSkipMode;
+    uint32_t frm_num;
+    uint32_t dumpFrmCnt;
+    uint32_t skip_mode;
     uint32_t mDumpSkipCnt;
 };
 
@@ -253,7 +253,6 @@ protected:
     QCamera3StreamMem mOfflineMetaMemory; //reprocessing metadata buffer
     List<uint32_t> mFreeOfflineMetaBuffersList;
     Mutex mFreeOfflineMetaBuffersLock;
-    android::List<mm_camera_super_buf_t *> mOutOfSequenceBuffers;
 
 private:
 
@@ -451,7 +450,6 @@ private:
     bool needsFramePostprocessing(metadata_buffer_t* meta);
     int32_t handleOfflinePpCallback(uint32_t resultFrameNumber,
             Vector<mm_camera_super_buf_t *>& pendingCbs);
-    mm_camera_super_buf_t* getNextPendingCbBuffer();
 };
 
 /* QCamera3PicChannel is for JPEG stream, which contains a YUV stream generated

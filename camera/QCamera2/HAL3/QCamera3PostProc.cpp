@@ -1155,10 +1155,6 @@ int32_t QCamera3PostProcessor::encodeFWKData(qcamera_hal3_jpeg_data_t *jpeg_job_
     }
 
     hal_obj = (QCamera3HardwareInterface*)m_parent->mUserData;
-    if (hal_obj == NULL) {
-        LOGE("hal_obj is NULL, Error");
-        return BAD_VALUE;
-    }
 
     if (mJpegClientHandle <= 0) {
         LOGE("Error: bug here, mJpegClientHandle is 0");
@@ -1195,27 +1191,7 @@ int32_t QCamera3PostProcessor::encodeFWKData(qcamera_hal3_jpeg_data_t *jpeg_job_
         encodeParam.thumb_dim.src_dim = src_dim;
         encodeParam.thumb_dim.dst_dim = jpeg_settings->thumbnail_size;
 
-        LOGI("Src Buffer cnt = %d, res = %dX%d len = %d rot = %d "
-            "src_dim = %dX%d dst_dim = %dX%d",
-            encodeParam.num_src_bufs,
-            encodeParam.src_main_buf[0].offset.mp[0].stride,
-            encodeParam.src_main_buf[0].offset.mp[0].scanline,
-            encodeParam.src_main_buf[0].offset.frame_len,
-            encodeParam.rotation,
-            src_dim.width, src_dim.height,
-            dst_dim.width, dst_dim.height);
-        LOGI("Src THUMB buf_cnt = %d, res = %dX%d len = %d rot = %d "
-            "src_dim = %dX%d, dst_dim = %dX%d",
-            encodeParam.num_tmb_bufs,
-            encodeParam.src_thumb_buf[0].offset.mp[0].stride,
-            encodeParam.src_thumb_buf[0].offset.mp[0].scanline,
-            encodeParam.src_thumb_buf[0].offset.frame_len,
-            encodeParam.thumb_rotation,
-            encodeParam.thumb_dim.src_dim.width,
-            encodeParam.thumb_dim.src_dim.height,
-            encodeParam.thumb_dim.dst_dim.width,
-            encodeParam.thumb_dim.dst_dim.height);
-
+        getFWKJpegEncodeConfig(encodeParam, recvd_frame, jpeg_settings);
         LOGH("#src bufs:%d # tmb bufs:%d #dst_bufs:%d",
                      encodeParam.num_src_bufs,encodeParam.num_tmb_bufs,encodeParam.num_dst_bufs);
 
@@ -1360,14 +1336,10 @@ int32_t QCamera3PostProcessor::encodeData(qcamera_hal3_jpeg_data_t *jpeg_job_dat
     QCamera3HardwareInterface* hal_obj = NULL;
     mm_jpeg_debug_exif_params_t *exif_debug_params = NULL;
     if (m_parent != NULL) {
-        hal_obj = (QCamera3HardwareInterface*)m_parent->mUserData;
-        if (hal_obj == NULL) {
-            LOGE("hal_obj is NULL, Error");
-            return BAD_VALUE;
-        }
+       hal_obj = (QCamera3HardwareInterface*)m_parent->mUserData;
     } else {
-        LOGE("m_parent is NULL, Error");
-        return BAD_VALUE;
+       LOGE("m_parent is NULL, Error");
+       return BAD_VALUE;
     }
     bool needJpegRotation = false;
 
@@ -1489,6 +1461,9 @@ int32_t QCamera3PostProcessor::encodeData(qcamera_hal3_jpeg_data_t *jpeg_job_dat
         }
         encodeParam.main_dim.dst_dim = dst_dim;
         encodeParam.thumb_dim.dst_dim = jpeg_settings->thumbnail_size;
+        if (needJpegRotation) {
+           encodeParam.rotation = (uint32_t)jpeg_settings->jpeg_orientation;
+        }
 
         LOGI("Src Buffer cnt = %d, res = %dX%d len = %d rot = %d "
             "src_dim = %dX%d dst_dim = %dX%d",

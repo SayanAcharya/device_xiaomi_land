@@ -81,7 +81,6 @@ public:
     // Frame number getter and setter
     int32_t markFrameNumber(uint32_t index, uint32_t frameNumber);
     int32_t getFrameNumber(uint32_t index);
-    int32_t getOldestFrameNumber(uint32_t &index);
     int32_t getGrallocBufferIndex(uint32_t frameNumber);
     int32_t getHeapBufferIndex(uint32_t frameNumber);
 
