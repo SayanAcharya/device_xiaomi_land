@@ -134,7 +134,7 @@ PRODUCT_PACKAGES += \
 # Configstore
 PRODUCT_PACKAGES += \
     android.hardware.configstore@1.0-service
-    
+
 # Consumerir
 PRODUCT_PACKAGES += \
     android.hardware.ir@1.0-impl
@@ -223,7 +223,7 @@ PRODUCT_PACKAGES += \
     android.hardware.gnss@1.0-impl \
     android.hardware.gnss@1.0-impl-qti \
     android.hardware.gnss@1.0-service-qti
-    
+
 
 PRODUCT_COPY_FILES += \
     $(DEVICE_PATH)/gps/etc/apdr.conf:system/vendor/etc/apdr.conf \
@@ -279,6 +279,13 @@ PRODUCT_PACKAGES += \
     android.hardware.light@2.0-impl \
     android.hardware.light@2.0-service
 
+# Live Wallpapers
+PRODUCT_PACKAGES += \
+    LiveWallpapers \
+    LiveWallpapersPicker \
+    VisualizationWallpapers \
+    librs_jni
+
 # Media
 PRODUCT_PACKAGES += \
     libc2dcolorconvert \
@@ -315,7 +322,7 @@ PRODUCT_PACKAGES += \
 # Power
 PRODUCT_PACKAGES += \
     power.msm8937
-    
+
 PRODUCT_PACKAGES += \
     android.hardware.power@1.0-service \
     android.hardware.power@1.0-impl
@@ -407,7 +414,7 @@ PRODUCT_PACKAGES += \
     wificond \
     wpa_supplicant \
     wpa_supplicant.conf
-    
+
 PRODUCT_PACKAGES += \
     android.hardware.wifi@1.0-service
 
