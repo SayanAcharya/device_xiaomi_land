@@ -52,7 +52,7 @@ KERNEL_TOOLCHAIN_PREFIX := $(ANDROID_BUILD_TOP)/prebuilts/gcc/$(HOST_OS)-x86/aar
 TARGET_KERNEL_SOURCE := kernel/xiaomi/msm8937
 
 # ANT
-#BOARD_ANT_WIRELESS_DEVICE := "vfs-prerelease"
+BOARD_ANT_WIRELESS_DEVICE := "vfs-prerelease"
 
 # Audio
 AUDIO_FEATURE_ENABLED_ALAC_OFFLOAD := true
