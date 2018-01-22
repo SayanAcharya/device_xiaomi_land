@@ -23,8 +23,8 @@ DEVICE_PACKAGE_OVERLAYS += $(DEVICE_PATH)/overlay
 # TARGET_BOARD_PLATFORM specific featurization
 QCOM_BOARD_PLATFORMS := msm8937
 
-PRODUCT_ENFORCE_RRO_TARGETS := \
-    framework-res
+#PRODUCT_ENFORCE_RRO_TARGETS := \
+#    framework-res
 
 # List of targets that use video hw
 MSM_VIDC_TARGET_LIST := msm8937
@@ -71,6 +71,9 @@ PRODUCT_COPY_FILES += \
     frameworks/native/data/etc/android.hardware.usb.host.xml:system/etc/permissions/android.hardware.usb.host.xml \
     frameworks/native/data/etc/android.hardware.wifi.direct.xml:system/etc/permissions/android.hardware.wifi.direct.xml \
     frameworks/native/data/etc/android.hardware.wifi.xml:system/etc/permissions/android.hardware.wifi.xml
+
+PRODUCT_PACKAGES += \
+    charger_res_images
 
 # Audio
 PRODUCT_PACKAGES += \
