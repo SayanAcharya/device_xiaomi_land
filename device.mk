@@ -377,7 +377,7 @@ PRODUCT_COPY_FILES += \
 
 # Snap
 PRODUCT_PACKAGES += \
-    Snap
+    SnapdragonCamera
 
 # Thermal
 PRODUCT_PACKAGES += \
